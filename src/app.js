@@ -115,9 +115,11 @@ function processEvent(event) {
                                   }
                             });
 
+                        }else{
+                            sendFBMessage(sender,{text: responseText});
                         }
                     }else{
-                        sendFBMessage(sender,{text: responseText})
+                        sendFBMessage(sender,{text: responseText});
                     }
                 }
 
