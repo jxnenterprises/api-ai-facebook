@@ -7,6 +7,7 @@ const uuid = require('node-uuid');
 const request = require('request');
 const JSONbig = require('json-bigint');
 const async = require('async');
+const requestify = require('requestify');
 
 const REST_PORT = (process.env.PORT || 5000);
 const APIAI_ACCESS_TOKEN = process.env.APIAI_ACCESS_TOKEN;
@@ -37,9 +38,15 @@ function processEvent(event) {
 
         apiaiRequest.on('response', (response) => {
             if (isDefined(response.result)) {
+
                 let responseText = response.result.fulfillment.speech;
                 let responseData = response.result.fulfillment.data;
                 let action = response.result.action;
+                let isActionNotComplete = response.result.actionIncomplete;
+                let parameters = response.result.parameters;
+
+                console.log(responseText);
+                console.log(responseData);
 
                 if (isDefined(responseData) && isDefined(responseData.facebook)) {
                     try {
@@ -52,11 +59,66 @@ function processEvent(event) {
                     console.log('Response as text message');
                     // facebook API limit for text length is 320,
                     // so we split message if needed
-                    var splittedText = splitResponse(responseText);
+                    //var splittedText = splitResponse(responseText);
 
-                    async.eachSeries(splittedText, (textPart, callback) => {
-                        sendFBMessage(sender, {text: textPart}, callback);
-                    });
+                    // async.eachSeries(splittedText, (textPart, callback) => {
+                    //     sendFBMessage(sender, {text: textPart}, callback);
+                    // });
+                    if(isActionNotComplete == false){
+                        if(action == "sermonSearch"){
+
+                            var weekArr = ['1st','2nd','3rd','4th','5th','first','second','third','fourth','fifth'];
+                            var monthArr = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+                            var yearArr = ['2012','2013','2014','2015','2016'];
+
+                            let sermon = parameters.sermonName;
+                            let date = parameters.date;
+                            let mediaType = parameters.mediaType;
+                            var week,month,year;
+
+                            var res = date.split(" ");
+                            for (var i = 0; i < res.length; i++) {
+                                var x = res[i].toLowerCase();
+                                if(weekArr.indexOf(x) != -1 ){
+                                    week = x;
+                                    if(week == "first"){
+                                        week = "1st";
+                                    }else if(week == "second"){
+                                        week = "2nd";
+                                    }else if(week == "third"){
+                                        week = "3rd";
+                                    }else if(week == "fourth"){
+                                        week = "4th";
+                                    }else if(week == "fifth"){
+                                        week = "5th";
+                                    }
+                                }else if(monthArr.indexOf(x) != -1 ){
+                                    month = x;
+                                }else if(yearArr.indexOf(x) != -1 ){
+                                    year = x;
+                                }
+                            };
+
+                            var url = "https://eimi.io/sermondb.php?cruchorspeaker="+sermon+"&month="+month+"&week="+week+"&year="+year+"&audioorvideo="+mediaType;
+
+                            console.log("Url: "+url);
+
+                            requestify.get(url)
+                            .then(function(response) {
+                                  var response = response.getBody();
+                                  response = response.trim();
+                                  if(response=="nulli"){
+                                    sendFBMessage(sender,{text: "No result found"});
+                                  }else{
+                                    response = response.replace(",,","");
+                                    sendFBMessage(sender,{text: "Click it to access audio: \n"+response});
+                                  }
+                            });
+
+                        }
+                    }else{
+                        sendFBMessage(sender,{text: responseText})
+                    }
                 }
 
             }
